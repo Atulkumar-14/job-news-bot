@@ -2,19 +2,22 @@ import os
 import requests
 import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
+from telegram.ext import (
+    ApplicationBuilder, ContextTypes,
+    CommandHandler, MessageHandler, filters
+)
 from dotenv import load_dotenv
 
-# Enable logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load from .env
+# ✅ Load environment variables
 load_dotenv()
-
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
+# ✅ Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ✅ Helper functions
 def matches_filters(text, keywords):
     text = text.lower()
     return any(kw.lower() in text for kw in keywords)
@@ -49,7 +52,9 @@ def fetch_remotive_jobs(location="", mode="remote", keywords=None):
             break
     return filtered
 
+# ✅ Send articles or jobs
 async def send_articles(update: Update, context: ContextTypes.DEFAULT_TYPE, articles, label=""):
+    logging.info(f"Sending {len(articles)} {label}")
     if not articles:
         await update.message.reply_text(f"No {label.lower()} found.")
         return
@@ -58,8 +63,9 @@ async def send_articles(update: Update, context: ContextTypes.DEFAULT_TYPE, arti
         message += f"• [{title}]({url})\n"
     await update.message.reply_text(message, parse_mode="Markdown", disable_web_page_preview=True)
 
-# Command Handlers
+# ✅ Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("Received /start")
     await update.message.reply_text(
         "👋 Hi! I'm your job & news bot.\n"
         "Use commands like:\n"
@@ -71,6 +77,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def internships(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(f"Received /internships with args: {context.args}")
     args = context.args
     location = args[0] if args else ""
     keywords = args[1:] if len(args) > 1 else []
@@ -78,6 +85,7 @@ async def internships(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_articles(update, context, articles, label="Internship News")
 
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(f"Received /jobs with args: {context.args}")
     args = context.args
     location = args[0] if args else ""
     keywords = args[1:] if len(args) > 1 else []
@@ -85,21 +93,32 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_articles(update, context, job_list, label="Remote Jobs")
 
 async def technews(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(f"Received /technews with args: {context.args}")
     args = context.args
     keywords = args if args else []
     articles = fetch_news("technology", "", keywords)
     await send_articles(update, context, articles, label="Tech News")
 
-# ✅ Main Bot Runner (NO asyncio.run!)
+# ✅ Fallback handler for plain text
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("Received plain message")
+    await update.message.reply_text(
+        "💬 I only understand commands like /jobs, /technews, or /internships.\n"
+        "Try `/jobs remote python` for example.",
+        parse_mode="Markdown"
+    )
+
+# ✅ Main application setup
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Register handlers
+    # Add handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("jobs", jobs))
     app.add_handler(CommandHandler("internships", internships))
     app.add_handler(CommandHandler("technews", technews))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-    logging.info("Bot is running...")
+    logging.info("✅ Bot is running...")
 
     app.run_polling()
