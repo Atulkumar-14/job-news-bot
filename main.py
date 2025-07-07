@@ -106,9 +106,14 @@ if __name__ == "__main__":
     import asyncio
 
     try:
+        # Preferred: use asyncio.run if possible
         asyncio.run(main())
-    except RuntimeError:
-        # Fix for "event loop already running" on Railway or special environments
-        loop = asyncio.get_event_loop()
-        loop.create_task(main())
-        loop.run_forever()
+    except RuntimeError as e:
+        # Handle "event loop already running" error in Railway or similar envs
+        if "already running" in str(e):
+            loop = asyncio.get_event_loop()
+            loop.create_task(main())
+            loop.run_forever()
+        else:
+            raise
+
