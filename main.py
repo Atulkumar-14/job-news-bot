@@ -1,9 +1,16 @@
-import requests
 import os
-from telegram.ext import Updater, CommandHandler
+import requests
+import logging
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, ContextTypes, CommandHandler
+)
 from dotenv import load_dotenv
 
-# Load from .env (for local testing)
+# Enable logging
+logging.basicConfig(level=logging.INFO)
+
+# Load from .env
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -43,18 +50,18 @@ def fetch_remotive_jobs(location="", mode="remote", keywords=None):
             break
     return filtered
 
-def send_articles(update, articles, label=""):
+async def send_articles(update: Update, context: ContextTypes.DEFAULT_TYPE, articles, label=""):
     if not articles:
-        update.message.reply_text(f"No {label.lower()} found.")
+        await update.message.reply_text(f"No {label.lower()} found.")
         return
     message = f"*📢 {label}*\n\n"
     for title, url in articles:
         message += f"• [{title}]({url})\n"
-    update.message.reply_text(message, parse_mode="Markdown", disable_web_page_preview=True)
+    await update.message.reply_text(message, parse_mode="Markdown", disable_web_page_preview=True)
 
 # Command Handlers
-def start(update, context):
-    update.message.reply_text(
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
         "👋 Hi! I'm your job & news bot.\n"
         "Use commands like:\n"
         "`/jobs location keyword`\n"
@@ -64,35 +71,37 @@ def start(update, context):
         parse_mode="Markdown"
     )
 
-def internships(update, context):
+async def internships(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     location = args[0] if args else ""
     keywords = args[1:] if len(args) > 1 else []
     articles = fetch_news("internship", location, keywords)
-    send_articles(update, articles, label="Internship News")
+    await send_articles(update, context, articles, label="Internship News")
 
-def jobs(update, context):
+async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     location = args[0] if args else ""
     keywords = args[1:] if len(args) > 1 else []
     jobs = fetch_remotive_jobs(location, "remote", keywords)
-    send_articles(update, jobs, label="Remote Jobs")
+    await send_articles(update, context, jobs, label="Remote Jobs")
 
-def technews(update, context):
+async def technews(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     keywords = args if args else []
     articles = fetch_news("technology", "", keywords)
-    send_articles(update, articles, label="Tech News")
+    await send_articles(update, context, articles, label="Tech News")
 
-def main():
-    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("internships", internships))
-    dp.add_handler(CommandHandler("jobs", jobs))
-    dp.add_handler(CommandHandler("technews", technews))
-    updater.start_polling()
-    updater.idle()
+async def main():
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("internships", internships))
+    app.add_handler(CommandHandler("jobs", jobs))
+    app.add_handler(CommandHandler("technews", technews))
+
+    logging.info("Bot is running...")
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
