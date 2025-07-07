@@ -2,13 +2,12 @@ import os
 import requests
 import logging
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder, ContextTypes, CommandHandler
-)
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
 from dotenv import load_dotenv
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load from .env
 load_dotenv()
@@ -82,8 +81,8 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     location = args[0] if args else ""
     keywords = args[1:] if len(args) > 1 else []
-    jobs = fetch_remotive_jobs(location, "remote", keywords)
-    await send_articles(update, context, jobs, label="Remote Jobs")
+    job_list = fetch_remotive_jobs(location, "remote", keywords)
+    await send_articles(update, context, job_list, label="Remote Jobs")
 
 async def technews(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
@@ -91,32 +90,16 @@ async def technews(update: Update, context: ContextTypes.DEFAULT_TYPE):
     articles = fetch_news("technology", "", keywords)
     await send_articles(update, context, articles, label="Tech News")
 
-async def main():
+# ✅ Main Bot Runner (NO asyncio.run!)
+if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Add handlers
+    # Register handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("jobs", jobs))
     app.add_handler(CommandHandler("internships", internships))
     app.add_handler(CommandHandler("technews", technews))
 
-    logging.basicConfig(level=logging.INFO)
     logging.info("Bot is running...")
 
-    # Just await this directly. DO NOT wrap in asyncio.run()
-    await app.run_polling()
-
-# 👇👇👇 THIS IS THE FIX 👇👇👇
-if __name__ == "__main__":
-    import asyncio
-
-    # Start the bot properly in Railway or async environments
-    try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-    except RuntimeError as e:
-        if "already running" in str(e):
-            asyncio.ensure_future(main())
-            asyncio.get_event_loop().run_forever()
-        else:
-            raise
+    app.run_polling()
