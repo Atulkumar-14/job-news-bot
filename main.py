@@ -94,26 +94,29 @@ async def technews(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
+    # Add handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("internships", internships))
     app.add_handler(CommandHandler("jobs", jobs))
+    app.add_handler(CommandHandler("internships", internships))
     app.add_handler(CommandHandler("technews", technews))
 
+    logging.basicConfig(level=logging.INFO)
     logging.info("Bot is running...")
+
+    # Just await this directly. DO NOT wrap in asyncio.run()
     await app.run_polling()
 
+# 👇👇👇 THIS IS THE FIX 👇👇👇
 if __name__ == "__main__":
     import asyncio
 
+    # Start the bot properly in Railway or async environments
     try:
-        # Preferred: use asyncio.run if possible
-        asyncio.run(main())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
     except RuntimeError as e:
-        # Handle "event loop already running" error in Railway or similar envs
         if "already running" in str(e):
-            loop = asyncio.get_event_loop()
-            loop.create_task(main())
-            loop.run_forever()
+            asyncio.ensure_future(main())
+            asyncio.get_event_loop().run_forever()
         else:
             raise
-
